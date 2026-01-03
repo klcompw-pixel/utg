@@ -1,34 +1,33 @@
---jj
 local Rayfield = loadstring(game:HttpGet("https://sirius.menu/rayfield"))()
 local Window =
     Rayfield:CreateWindow(
     {
         Name = "Keyless UTG",
-        Icon = "circle-user-round", -- Icon in Topbar. Can use Lucide Icons (string) or Roblox Image (number). 0 to use no icon (default).
+        Icon = "circle-user-round",
         LoadingTitle = "Its Loading",
         LoadingSubtitle = "Please Wait",
-        Theme = "Default", -- Check https://docs.sirius.menu/rayfield/configuration/themes
+        Theme = "Default",
         DisableRayfieldPrompts = true,
-        DisableBuildWarnings = true, -- Prevents Rayfield from warning when the script has a version mismatch with the interface
+        DisableBuildWarnings = true,
         ConfigurationSaving = {
             Enabled = true,
-            FolderName = Xcz, -- Create a custom folder for your hub/game
+            FolderName = Xcz,
             FileName = "Lolultra"
         },
         Discord = {
-            Enabled = false, -- Prompt the user to join your Discord server if their executor supports it
-            Invite = "-", -- The Discord invite code, do not include discord.gg/. E.g. discord.gg/ ABCD would be ABCD
-            RememberJoins = false -- Set this to false to make them join the discord every time they load it up
+            Enabled = false,
+            Invite = "-",
+            RememberJoins = false
         },
-        KeySystem = false, -- Set this to true to use our key system
+        KeySystem = false,
         KeySettings = {
             Title = "Untitled",
             Subtitle = "Keey gg",
-            Note = "Nnoo methd", -- Use this to tell the user how to get a key
+            Note = "Nnoo methd",
             FileName = "Thiskeey",
             SaveKey = false,
-            GrabKeyFromSite = false, -- If this is true, set Key below to the RAW site you would like Rayfield to get the key from
-            Key = {"dude hell nah"} -- List of keys that will be accepted by the system, can be RAW file links (pastebin, github etc) or simple strings ("hello","key22")
+            GrabKeyFromSite = false,
+            Key = {"dude hell nah"}
         }
     }
 )
@@ -46,6 +45,30 @@ local tagEventPath =
     ReplicatedStorage:FindFirstChild("Events") and ReplicatedStorage.Events:FindFirstChild("game") and
     ReplicatedStorage.Events.game:FindFirstChild("tags") and
     ReplicatedStorage.Events.game.tags:FindFirstChild("TagPlayer")
+
+-- Helper to safely call RemoteFunction / RemoteEvent
+local function safeRemoteCall(remoteObj, ...)
+    local varargs = {...}
+    if not remoteObj then
+        return false, "remote-not-found"
+    end
+    -- prefer RemoteFunction (returns value)
+    if remoteObj.IsA and remoteObj:IsA("RemoteFunction") then
+        local ok, res = pcall(function() return remoteObj:InvokeServer(unpack(varargs)) end)
+        return ok, res
+    end
+    -- fallback to RemoteEvent (fire-and-forget)
+    if remoteObj.IsA and remoteObj:IsA("RemoteEvent") then
+        local ok, res = pcall(function() remoteObj:FireServer(unpack(varargs)) end)
+        return ok, res
+    end
+    -- Some environments expose functions directly
+    if typeof(remoteObj) == "function" then
+        local ok, res = pcall(function() return remoteObj(unpack(varargs)) end)
+        return ok, res
+    end
+    return false, "unsupported-remote-type"
+end
 local lastTagTime = {}
 local tagAuraRange = UserInputService.TouchEnabled and 7 or 8
 local tagEnabled = false
@@ -253,10 +276,8 @@ local unlimitedtag =
         end
     }
 )
--- Drawing objects
 local circleBorder, centerDot
 
--- POV Circle Functions
 local function createPOVCircle()
     if circleBorder then
         circleBorder:Remove()
@@ -269,7 +290,6 @@ local function createPOVCircle()
         return
     end
 
-    -- Create circle border
     circleBorder = Drawing.new("Circle")
     circleBorder.Visible = true
     circleBorder.Thickness = povCircleThickness
@@ -278,7 +298,6 @@ local function createPOVCircle()
     circleBorder.Filled = false
     circleBorder.NumSides = 64
 
-    -- Center dot
     centerDot = Drawing.new("Circle")
     centerDot.Visible = true
     centerDot.Filled = true
@@ -295,21 +314,17 @@ local function getCirclePosition()
 
     local viewportSize = camera.ViewportSize
     
-    -- Cek apakah perangkat mobile
     local UserInputService = game:GetService("UserInputService")
     local isMobile = UserInputService.TouchEnabled and not UserInputService.KeyboardEnabled
     
     if isMobile then
-        -- Mobile: gunakan tengah layar
         return Vector2.new(viewportSize.X / 2, viewportSize.Y / 2)
     else
-        -- PC: gunakan posisi mouse
         return UserInputService:GetMouseLocation()
     end
 end
 
 local function updatePOVCircle()
-    -- stop kalau circle dimatikan
     if not (povCircleEnabled and showPOVCircle) then
         if circleBorder then
             circleBorder.Visible = false
@@ -320,18 +335,15 @@ local function updatePOVCircle()
         return
     end
 
-    -- kalau camera belum ada, jangan lanjut
     local camera = workspace.CurrentCamera
     if not camera then
         return
     end
 
-    -- kalau object belum ada, buat dulu
     if not circleBorder or not centerDot then
         createPOVCircle()
     end
 
-    -- kalau circle masih gagal kebuat, jangan lanjut
     if not circleBorder or not centerDot then
         return
     end
@@ -344,7 +356,6 @@ local function updatePOVCircle()
     local viewportSize = camera.ViewportSize
     local radius = math.min(viewportSize.X, viewportSize.Y) / 2 * povCircleRadius
 
-    -- rainbow color
     if rainbowColorEnabled then
         local hue = (tick() * rainbowColorSpeed) % 1
         circleBorder.Color = Color3.fromHSV(hue, 1, 1)
@@ -368,7 +379,6 @@ local function isPlayerInCenter(player)
         return false
     end
 
-    -- First check physical distance
     local localChar = localPlayer.Character
     if not localChar then
         return false
@@ -384,7 +394,6 @@ local function isPlayerInCenter(player)
         return false
     end
 
-    -- Then check screen position
     local camera = workspace.CurrentCamera
     local screenPoint, onScreen = camera:WorldToViewportPoint(rootPart.Position)
     if not onScreen then
@@ -404,7 +413,6 @@ local function isPlayerInCenter(player)
     return distanceFromCenter <= safeZoneRadius
 end
 
--- Core Tagging Functions
 local function shouldStopTagging()
     if not stopDuringVoting then
         return false
@@ -482,7 +490,6 @@ local function isValidTarget(player)
         local localRole = localPlayer:FindFirstChild("PlayerRole")
 
         if localRole and localRole:IsA("StringValue") and (localRole.Value == "Alone" or localRole.Value == "FFATagger") then
-            -- Allow targeting anyone if you're Alone or FFATagger (do nothing, just continue)
         elseif localRole and playerRole and localRole.Value == playerRole.Value then
             return false
         end
@@ -521,7 +528,7 @@ local function checkMovement()
     local character = localPlayer.Character
     local humanoid = character and character:FindFirstChildOfClass("Humanoid")
     
-    if humanoid and humanoid.MoveDirection.Magnitude > 0.05 then -- Periksa apakah ada input gerakan
+    if humanoid and humanoid.MoveDirection.Magnitude > 0.05 then
         lastMoveTime = tick()
     end
 end
@@ -529,7 +536,6 @@ end
 RunService.Heartbeat:Connect(checkMovement)
 
 -- ==========================================================
--- Koneksi untuk melacak fokus aplikasi (Harus dipanggil saat script diinisialisasi)
 -- ==========================================================
 UserInputService.WindowFocused:Connect(function()
     isGameFocused = true
@@ -541,7 +547,6 @@ end)
 
 
 -- ==========================================================
--- Fungsi tagPlayer yang dimodifikasi
 -- ==========================================================
 local noCooldownEnabled = false
 
@@ -553,9 +558,7 @@ local ToggleNoCooldown = Tab:CreateToggle({
         noCooldownEnabled = Value
         
         if Value then
-            print("No Cooldown Tag: ENABLED - Instant tagging ready!")
         else
-            print("No Cooldown Tag: DISABLED - Normal cooldown restored")
         end
    end,
 })
@@ -564,7 +567,6 @@ local ToggleNoCooldown = Tab:CreateToggle({
 local function tagPlayer(player)
     local currentTime = tick()
 
-    -- Pengecekan gerakan dan fokus aplikasi
     if not isGameFocused then
         return
     end
@@ -587,7 +589,6 @@ local function tagPlayer(player)
 
     -- ========== NO COOLDOWN SYSTEM ==========
     if not noCooldownEnabled then
-        -- Original cooldown checks (hanya jika no cooldown disabled)
         if lastTagTime[player] and currentTime - lastTagTime[player] < 1 then
             return
         end
@@ -627,20 +628,16 @@ local function tagPlayer(player)
         [2] = targetHRP.Position + offset
     }
 
-    local success, response = pcall(function()
-        return tagEventPath:InvokeServer(unpack(args))
-    end)
+    local success, response = safeRemoteCall(tagEventPath, unpack(args))
     
     if success then
         -- ========== CONDITIONAL COOLDOWN UPDATE ==========
         if not noCooldownEnabled then
-            -- Only update cooldown timers jika no cooldown disabled
             lastTagTime[player] = currentTime
             lastGlobalTag = currentTime
         end
         -- Jika noCooldownEnabled = true, tidak update cooldown timers = NO COOLDOWN
 
-        -- Animation system (tanpa high bounce)
         if legitTag then
             local humanoid = localCharacter:FindFirstChildOfClass("Humanoid")
             if humanoid then
@@ -653,7 +650,6 @@ local function tagPlayer(player)
                 if animFolder then
                     local tagAnim = animFolder:FindFirstChild("Tag1") or animFolder:FindFirstChild("Tag2")
                     if tagAnim then
-                        -- Stop anim lama
                         for _, track in ipairs(animator:GetPlayingAnimationTracks()) do
                             if track.Animation == tagAnim then
                                 track:Stop()
@@ -828,7 +824,6 @@ game:GetService("Players").PlayerRemoving:Connect(
 local Success, Players = pcall(function() return game:GetService("Players") end)
 local Success2, RunService = pcall(function() return game:GetService("RunService") end)
 
--- Jika Service tidak ditemukan (meskipun sangat jarang), hentikan eksekusi
 if not Players or not RunService then
     warn("ERROR: Could not find Players or RunService service. Script terminated.")
     return
@@ -837,17 +832,14 @@ end
 local localPlayer = Players.LocalPlayer
 
 -- ==========================================================
--- VARIABEL STATUS GLOBAL
 -- ==========================================================
 local hitboxEnabled = false
-local hitboxSize = 4 -- Ukuran default ekspansi (contoh: 4 stud)
+local hitboxSize = 4
 
 -- ==========================================================
--- FUNGSI PEMBANTU (Role & Target Check)
 -- ==========================================================
 
 local function getLocalPlayerRole()
-    -- Pengecekan nil pada localPlayer sebelum mencari Child
     if not localPlayer then return nil end 
     local roleValue = localPlayer:FindFirstChild("PlayerRole")
     if roleValue and roleValue:IsA("StringValue") then
@@ -857,7 +849,6 @@ local function getLocalPlayerRole()
 end
 
 local function getPlayerRole(player)
-    -- Pengecekan nil pada instance player sebelum mencari Child
     if not player then return nil end
     local roleValue = player:FindFirstChild("PlayerRole")
     if roleValue and roleValue:IsA("StringValue") then
@@ -887,7 +878,6 @@ end
 
 
 -- ==========================================================
--- LOGIC HITBOX EXPANDER (MENGGUNAKAN PART BARU + WELD)
 -- ==========================================================
 local function updateHitboxes()
     if not hitboxEnabled then
@@ -896,57 +886,44 @@ local function updateHitboxes()
     
     local localRole = getLocalPlayerRole()
     
-    -- MULAI PERULANGAN UNIK
     for _, player in ipairs(Players:GetPlayers()) do
         local character = player.Character
         
-        -- Dapatkan HRP (Part Target Asli)
         local hrp = character and character:FindFirstChild("HumanoidRootPart")
 
-        -- Pengecekan Vital: Pastikan objek 'player' valid, Character, dan HRP ada
         if player and player:IsA("Player") and hrp then
             
-            -- Dapatkan atau Buat Hitbox Part Tambahan (Part yang diperbesar)
             local hitboxPart = hrp:FindFirstChild("HitboxExpanderPart")
             
             if isValidTarget(player, localRole) then
-                -- Target valid: Buat atau perbarui hitbox
                 
                 if not hitboxPart then
-                    -- 1. Buat Part Baru (Hanya terjadi sekali per pemain)
                     hitboxPart = Instance.new("Part")
                     hitboxPart.Name = "HitboxExpanderPart"
                     
                     -- Atur properti agar tidak mengganggu gameplay atau deteksi anti-cheat
-                    hitboxPart.Transparency = 1 -- Sembunyikan sepenuhnya
+                    hitboxPart.Transparency = 1
                     hitboxPart.CanCollide = false
                     hitboxPart.Anchored = false
-                    hitboxPart.Massless = true -- Agar tidak memengaruhi fisika pemain
+                    hitboxPart.Massless = true
                     
-                    -- PENTING: WeldConstraint adalah yang membuat Part mengikuti HRP
                     local weld = Instance.new("WeldConstraint")
                     weld.Part0 = hrp
                     weld.Part1 = hitboxPart
                     weld.Parent = hitboxPart
                     
-                    -- Masukkan Part ke Karakter agar mengikuti HRP
                     hitboxPart.Parent = character
                 end
                 
-                -- 3. Perbarui Ukuran Hitbox setiap frame
-                -- Perlu diingat bahwa Size.Y diatur lebih besar untuk jangkauan vertikal
                 hitboxPart.Size = Vector3.new(
-                    hitboxSize,         -- X (Lebar dari Slider)
-                    hrp.Size.Y * 2.5,   -- Y (Tinggi HRP dikali 2.5 untuk mencakup tubuh)
-                    hitboxSize          -- Z (Panjang dari Slider)
+                    hitboxSize,
+                    hrp.Size.Y * 2.5,
+                    hitboxSize
                 )
                 
-                -- Set Attribute di HRP sebagai penanda
                 hrp:SetAttribute("ClientHitboxExpanded", true)
             else
-                -- RESET LOGIC (Target tidak valid/sudah menjadi tim/mati)
                 if hrp:GetAttribute("ClientHitboxExpanded") and hitboxPart then
-                    -- Hancurkan part tambahan dan hapus penanda
                     hitboxPart:Destroy()
                     hrp:SetAttribute("ClientHitboxExpanded", nil) 
                 end
@@ -955,14 +932,12 @@ local function updateHitboxes()
     end
 end
 
--- Reset semua Hitbox yang tersisa saat script dimatikan
 local function resetAllHitboxes()
     for _, player in ipairs(Players:GetPlayers()) do
         local character = player.Character
         if character then
             local hrp = character:FindFirstChild("HumanoidRootPart")
             if hrp and hrp:GetAttribute("ClientHitboxExpanded") then
-                -- Cari dan hancurkan part tambahan
                 local hitboxPart = hrp:FindFirstChild("HitboxExpanderPart")
                 if hitboxPart then
                     hitboxPart:Destroy()
@@ -973,14 +948,11 @@ local function resetAllHitboxes()
     end
 end
 
--- Hubungkan ke RunService.RenderStepped untuk update yang mulus (setiap frame)
 local heartbeatConnection = RunService.RenderStepped:Connect(updateHitboxes)
-heartbeatConnection:Disconnect() -- Disconnect default, akan dihubungkan oleh Toggle
+heartbeatConnection:Disconnect()
 
 -- ==========================================================
--- INTEGRASI UI 
 -- ==========================================================
--- Cleanup
 script.Destroying:Connect(function()
     if heartbeatConnection then
         heartbeatConnection:Disconnect()
@@ -1090,28 +1062,23 @@ local function shouldShowESP(player)
         return false
     end
 
-    -- Get role values
     local roleValue = player:FindFirstChild("PlayerRole") and player.PlayerRole.Value
     local localRoleValue = localPlayer:FindFirstChild("PlayerRole") and localPlayer.PlayerRole.Value
 
-    -- Check for dead state (health or state) and Dead role
     local isDead =
         humanoid.Health <= 0 or humanoid:GetState() == Enum.HumanoidStateType.Dead or
         roleValue == "Dead"
 
-    -- Ignore dead players if the toggle is on
     if espConfig.ignoreDead and isDead then
         return false
     end
 
-    -- MODIFIKASI: Jika local player adalah Crown/SoloCrown, hanya tampilkan ESP untuk Neutral
     if localRoleValue == "Crown" or localRoleValue == "SoloCrown" then
         if roleValue ~= "Neutral" then
             return false
         end
     end
 
-    -- Role filters
     if espConfig.showNeutralOnly and roleValue ~= "Neutral" then
         return false
     end
@@ -1122,7 +1089,6 @@ local function shouldShowESP(player)
         return false
     end
 
-    -- Team check
     if espConfig.teamCheck then
         if roleValue and localRoleValue and roleValue == localRoleValue then
             return false
@@ -1136,7 +1102,7 @@ local function cleanUpPlayerESP(player)
         if espObjects[player].gui then
             espObjects[player].gui:Destroy()
         end
-        espObjects[player] = nil -- Clear reference
+        espObjects[player] = nil
     end
 end
 
@@ -1147,7 +1113,7 @@ local function cleanUpTracer(player)
                 tracer:Remove()
             end
         end
-        tracerObjects[player] = nil -- Clear reference
+        tracerObjects[player] = nil
     end
 end
 local function cleanupDeadPlayers()
@@ -1186,11 +1152,9 @@ local function shouldShowTracer(player)
         return false
     end
 
-    -- Get role values
     local roleValue = player:FindFirstChild("PlayerRole") and player.PlayerRole.Value
     local localRoleValue = localPlayer:FindFirstChild("PlayerRole") and localPlayer.PlayerRole.Value
 
-    -- Dead check (both role and state)
     local isDead =
         humanoid.Health <= 0 or humanoid:GetState() == Enum.HumanoidStateType.Dead or
         roleValue == "Dead"
@@ -1199,14 +1163,12 @@ local function shouldShowTracer(player)
         return false
     end
 
-    -- MODIFIKASI: Jika local player adalah Crown/SoloCrown, hanya tampilkan tracer untuk Neutral
     if localRoleValue == "Crown" or localRoleValue == "SoloCrown" then
         if roleValue ~= "Neutral" then
             return false
         end
     end
 
-    -- Team check
     if tracerConfig.teamCheck then
         if roleValue and localRoleValue and roleValue == localRoleValue then
             return false
@@ -1215,7 +1177,6 @@ local function shouldShowTracer(player)
 
     return true
 end
--- ESP Creation and Update
 local function updateESPDisplay(player)
     if not espConfig.enabled or not espObjects[player] then
         return
@@ -1249,34 +1210,28 @@ local function updateESPDisplay(player)
         espObjects[player].gui.Adornee = hrp
     end
 end
--- Improved queueUpdate function
 local function queueUpdate(player)
-    -- Mark player for update
     updateQueue[player] = true
 
-    -- Start update process if not already running
     if not updatePending then
         updatePending = true
         task.spawn(
             function()
-                -- Wait until next allowed update time
                 local timeToWait = lastUpdateTime + espConfig.updateInterval - tick()
                 if timeToWait > 0 then
                     task.wait(timeToWait)
                 end
 
-                -- Process all queued updates
                 local playersToUpdate = {}
                 for queuedPlayer in pairs(updateQueue) do
-                    if queuedPlayer and queuedPlayer.Parent then -- Only update valid players
+                    if queuedPlayer and queuedPlayer.Parent then
                         table.insert(playersToUpdate, queuedPlayer)
                     end
                     updateQueue[queuedPlayer] = nil
                 end
 
-                -- Perform updates
                 for _, playerToUpdate in ipairs(playersToUpdate) do
-                    if espObjects[playerToUpdate] then -- Only if ESP exists for player
+                    if espObjects[playerToUpdate] then
                         updateESPDisplay(playerToUpdate)
                     end
                 end
@@ -1303,7 +1258,6 @@ local function createESP(player)
         return
     end
 
-    -- Create ESP GUI
     local billboard = Instance.new("BillboardGui")
     billboard.Size = UDim2.new(espConfig.size, 0, espConfig.size / 4, 0)
     billboard.StudsOffset = Vector3.new(0, 3, 0)
@@ -1319,14 +1273,12 @@ local function createESP(player)
     textLabel.Font = Enum.Font.SourceSans
     textLabel.Parent = billboard
 
-    -- Store ESP data
     espObjects[player] = {
         gui = billboard,
         label = textLabel,
         connections = {}
     }
 
-    -- Set up event connections
     local function onRoleChanged()
         queueUpdate(player)
     end
@@ -1335,18 +1287,15 @@ local function createESP(player)
         local humanoid = newCharacter:WaitForChild("Humanoid")
         local rootPart = newCharacter:WaitForChild("HumanoidRootPart")
 
-        -- pastikan slot espObjects ada
         if not espObjects[player] then
             espObjects[player] = {connections = {}}
         end
 
-        -- bersihkan koneksi lama
         if espObjects[player].humanoidDiedConn then
             espObjects[player].humanoidDiedConn:Disconnect()
             espObjects[player].humanoidDiedConn = nil
         end
 
-        -- koneksi event mati
         if espConfig.ignoreDead or tracerConfig.ignoreDead then
             espObjects[player].humanoidDiedConn =
                 humanoid.Died:Connect(
@@ -1361,7 +1310,6 @@ local function createESP(player)
             )
         end
 
-        -- update awal
         if espConfig.enabled then
             updateESPDisplay(player)
         end
@@ -1374,7 +1322,6 @@ local function createESP(player)
             espObjects[player] = {connections = {}}
         end
 
-        -- role change listener
         local role = player:FindFirstChild("PlayerRole")
         if role then
             local roleConn =
@@ -1386,7 +1333,6 @@ local function createESP(player)
             table.insert(espObjects[player].connections, roleConn)
         end
 
-        -- character added listener
         local charConn =
             player.CharacterAdded:Connect(
             function(character)
@@ -1395,7 +1341,6 @@ local function createESP(player)
         )
         table.insert(espObjects[player].connections, charConn)
 
-        -- kalau player sudah spawn
         if player.Character then
             onCharacterAdded(player, player.Character)
         end
@@ -1418,7 +1363,6 @@ local function createTracer(player)
         return
     end
 
-    -- Create tracer
     local tracer = Drawing.new("Line")
     tracer.Visible = false
     tracer.Thickness = tracerConfig.thickness
@@ -1433,7 +1377,7 @@ end
 local function updateTracers()
     if not tracerConfig.enabled then
         return
-    end -- kalau ESP mati, keluar
+    end
 
     local localChar = localPlayer.Character
     if not localChar then
@@ -1445,7 +1389,6 @@ local function updateTracers()
         return
     end
 
-    -- Bersihkan player yang mati / role Dead
     if tracerConfig.ignoreDead then
         for player, _ in pairs(tracerObjects) do
             if player and player.Parent then
@@ -1468,14 +1411,12 @@ local function updateTracers()
         end
     end
 
-    -- Update posisi untuk semua player yang sudah ada tracernya
     for player, tracers in pairs(tracerObjects) do
         if player and player.Parent and player.Character then
             local hrp = player.Character:FindFirstChild("HumanoidRootPart")
             if hrp then
                 local shouldShow = true
 
-                -- ignoreDead
                 if tracerConfig.ignoreDead then
                     local humanoid = player.Character:FindFirstChildOfClass("Humanoid")
                     if humanoid and humanoid.Health <= 0 then
@@ -1487,7 +1428,6 @@ local function updateTracers()
                     end
                 end
 
-                -- teamCheck
                 if shouldShow and tracerConfig.teamCheck then
                     local role = player:FindFirstChild("PlayerRole")
                     local localRole = localPlayer:FindFirstChild("PlayerRole")
@@ -1496,14 +1436,13 @@ local function updateTracers()
                     end
                 end
 
-                -- Update setiap line tracer
                 for _, tracer in ipairs(tracers) do
                     if tracer then
                         local screenPos, onScreen = workspace.CurrentCamera:WorldToViewportPoint(hrp.Position)
                         if onScreen and shouldShow then
                             local viewSize = workspace.CurrentCamera.ViewportSize
-                            tracer.From = Vector2.new(viewSize.X / 2, viewSize.Y) -- titik bawah tengah
-                            tracer.To = Vector2.new(screenPos.X, screenPos.Y) -- posisi musuh
+                            tracer.From = Vector2.new(viewSize.X / 2, viewSize.Y)
+                            tracer.To = Vector2.new(screenPos.X, screenPos.Y)
                             tracer.Color = getRoleColor(player:FindFirstChild("PlayerRole") and player.PlayerRole.Value)
                             tracer.Thickness = tracerConfig.thickness
                             tracer.Transparency = tracerConfig.transparency
@@ -1519,7 +1458,6 @@ local function updateTracers()
         end
     end
 
-    -- Bikin tracer baru untuk player yang valid
     for _, player in ipairs(Players:GetPlayers()) do
         if player ~= localPlayer and not tracerObjects[player] then
             if shouldShowTracer(player) then
@@ -1534,17 +1472,14 @@ local function startUpdateLoop()
     local lastUpdate = 0
 
     local function updateAll()
-        -- Throttle updates based on updateInterval
         local now = tick()
         if now - lastUpdate < espConfig.updateInterval then
             return
         end
         lastUpdate = now
 
-        -- Update all players
         for _, player in ipairs(Players:GetPlayers()) do
             if player ~= localPlayer then
-                -- ESP Update
                 if espConfig.enabled and shouldShowESP(player) then
                     if not espObjects[player] then
                         createESP(player)
@@ -1555,7 +1490,6 @@ local function startUpdateLoop()
                     cleanUpPlayerESP(player)
                 end
 
-                -- Tracer Update
                 if tracerConfig.enabled and shouldShowTracer(player) then
                     if not tracerObjects[player] then
                         createTracer(player)
@@ -1566,7 +1500,6 @@ local function startUpdateLoop()
             end
         end
 
-        -- Continuous tracer updates
         updateTracers()
     end
 
@@ -1577,7 +1510,6 @@ local function startUpdateLoop()
     end
 end
 local function updatePlayerESP(player)
-    -- Handle ESP
     if espConfig.enabled then
         if shouldShowESP(player) then
             if not espObjects[player] then
@@ -1592,7 +1524,6 @@ local function updatePlayerESP(player)
         cleanUpPlayerESP(player)
     end
 
-    -- Handle Tracer
     if tracerConfig.enabled then
         if shouldShowTracer(player) then
             if not tracerObjects[player] then
@@ -1606,21 +1537,18 @@ local function updatePlayerESP(player)
     end
 end
 local function onCharacterAdded(player, newCharacter)
-    local humanoid = newCharacter:WaitForChild("Humanoid") -- benar: ambil Humanoid
-    local rootPart = newCharacter:WaitForChild("HumanoidRootPart") -- untuk posisi tracer/ESP
+    local humanoid = newCharacter:WaitForChild("Humanoid")
+    local rootPart = newCharacter:WaitForChild("HumanoidRootPart")
 
-    -- Initialize player entry in espObjects if not exists
     if not espObjects[player] then
         espObjects[player] = {}
     end
 
-    -- Clean up old connection if it exists
     if espObjects[player].humanoidDiedConn then
         espObjects[player].humanoidDiedConn:Disconnect()
         espObjects[player].humanoidDiedConn = nil
     end
 
-    -- Only connect death event if ignoreDead is enabled
     if espConfig.ignoreDead or tracerConfig.ignoreDead then
         espObjects[player].humanoidDiedConn =
             humanoid.Died:Connect(
@@ -1629,32 +1557,28 @@ local function onCharacterAdded(player, newCharacter)
                     updateESPDisplay(player)
                 end
                 if tracerConfig.enabled then
-                    cleanUpTracer(player) -- Remove tracer immediately
+                    cleanUpTracer(player)
                 end
             end
         )
     end
 
-    -- Initial update
     if espConfig.enabled then
-        updateESPDisplay(player, rootPart) -- kirim rootPart kalau butuh posisi
+        updateESPDisplay(player, rootPart)
     end
     if tracerConfig.enabled then
-        createTracer(player, rootPart) -- kirim rootPart kalau butuh posisi
+        createTracer(player, rootPart)
     end
 end
 local function setupPlayerEvents()
-    -- Player Added
     table.insert(
         connections,
         Players.PlayerAdded:Connect(
             function(player)
-                -- Character Added
                 local charConn
                 charConn =
                     player.CharacterAdded:Connect(
                     function(character)
-                        -- langsung tunggu komponen penting
                         local humanoid = character:WaitForChild("Humanoid", 5)
                         local rootPart = character:WaitForChild("HumanoidRootPart", 5)
                         if humanoid and rootPart then
@@ -1664,7 +1588,6 @@ local function setupPlayerEvents()
                 )
                 table.insert(connections, charConn)
 
-                -- Role Changed
                 local role = player:FindFirstChild("PlayerRole")
                 if role then
                     local roleConn =
@@ -1678,7 +1601,6 @@ local function setupPlayerEvents()
                     table.insert(connections, roleConn)
                 end
 
-                -- Initial Setup if character already exists
                 if player.Character then
                     onCharacterAdded(player, player.Character)
                 end
@@ -1686,7 +1608,6 @@ local function setupPlayerEvents()
         )
     )
 
-    -- Player Removing
     table.insert(
         connections,
         Players.PlayerRemoving:Connect(
@@ -1708,24 +1629,19 @@ local function clearAllESP()
     espObjects = {}
     tracerObjects = {}
 end
--- Added this new initialization function to replace the old setup
 local stopUpdateLoop
 local function initializeESP()
-    -- Cleanup previous instances
     if stopUpdateLoop then
         stopUpdateLoop()
     end
     clearAllESP()
 
-    -- Setup new instances
     setupPlayerEvents()
 
-    -- Start update loop if needed
     if espConfig.enabled or tracerConfig.enabled then
         stopUpdateLoop = startUpdateLoop()
     end
 
-    -- Initial update
     for _, player in ipairs(Players:GetPlayers()) do
         if player ~= localPlayer then
             updatePlayerESP(player)
@@ -1737,13 +1653,11 @@ local function forceFullUpdate()
         updatePlayerESP(player)
     end
 end
--- Initialize ESP for all players
 for _, player in ipairs(Players:GetPlayers()) do
     if player ~= localPlayer then
         updatePlayerESP(player)
     end
 end
--- Added proper character added handling
 table.insert(
     connections,
     Players.PlayerAdded:Connect(
@@ -1767,7 +1681,6 @@ table.insert(
     )
 )
 
--- Connect local player role changes
 local localRole = localPlayer:FindFirstChild("PlayerRole")
 if localRole then
     table.insert(
@@ -1840,7 +1753,6 @@ local function fullCleanup()
     end
 end
 
--- Teleport handler
 local teleportConnection
 teleportConnection =
     localPlayer.OnTeleport:Connect(
@@ -1871,7 +1783,6 @@ playerRemovingConnection =
     end
 )
 table.insert(connections, playerRemovingConnection)
--- ESP Toggle UI
 local ToggleEsp =
     Tab:CreateToggle(
     {
@@ -1895,10 +1806,9 @@ local KeybindToggleEsp =
         Callback = function()
             if uiClosed then
                 return
-            end -- kalau UI sudah ditutup, abaikan
+            end
             espConfig.enabled = not espConfig.enabled
 
-            -- update toggle UI aman
             pcall(
                 function()
                     ToggleEsp:Set(espConfig.enabled)
@@ -1961,7 +1871,6 @@ Tab:CreateToggle(
     }
 )
 local Section = Tab:CreateSection("Line esp(Lag)")
--- Toggle ESP Line
 local ToggleLine =
     Tab:CreateToggle(
     {
@@ -1973,7 +1882,6 @@ local ToggleLine =
             if Value then
                 initializeESP() -- ⬅️ paksa re-inisialisasi biar tracer loop hidup
             else
-                -- bersihkan semua tracer kalau dimatikan
                 for player, tracers in pairs(tracerObjects) do
                     cleanUpTracer(player)
                 end
@@ -1994,7 +1902,6 @@ Tab:CreateToggle(
     }
 )
 
--- Update the ignoreDead toggle to handle role changes
 Tab:CreateToggle(
     {
         Name = "Line Ignore Dead",
@@ -2002,13 +1909,11 @@ Tab:CreateToggle(
         Callback = function(Value)
             tracerConfig.ignoreDead = Value
 
-            -- Immediate cleanup if toggled on
             if Value then
                 for _, player in ipairs(Players:GetPlayers()) do
                     if player ~= localPlayer then
                         local shouldClean = false
 
-                        -- Check health/death state
                         if player.Character then
                             local humanoid = player.Character:FindFirstChildOfClass("Humanoid")
                             if humanoid then
@@ -2016,7 +1921,6 @@ Tab:CreateToggle(
                             end
                         end
 
-                        -- Check for Dead role
                         local playerRole = player:FindFirstChild("PlayerRole")
                         if playerRole and playerRole.Value == "Dead" then
                             shouldClean = true
@@ -2028,7 +1932,6 @@ Tab:CreateToggle(
                     end
                 end
             else
-                -- If toggled off, recreate tracers for valid players
                 for _, player in ipairs(Players:GetPlayers()) do
                     if player ~= localPlayer and shouldShowTracer(player) then
                         createTracer(player)
@@ -2038,7 +1941,6 @@ Tab:CreateToggle(
         end
     }
 )
--- Color Controls
 Tab:CreateToggle(
     {
         Name = "Custom Colors",
@@ -2084,13 +1986,12 @@ local infJumpEnabled = false
 local noclipEnabled = false
 local infJump
 local lastMovementTime = 0
-local movementThreshold = 30 -- 30 detik
+local movementThreshold = 30
 local movementCheck
 
 local function onMovement()
     lastMovementTime = tick()
     
-    -- Aktifkan infJump jika sebelumnya nonaktif karena diam
     if infJumpEnabled and not infJump then
         infJump =
             UserInputService.JumpRequest:Connect(
@@ -2105,7 +2006,6 @@ local function onMovement()
     end
 end
 
--- Deteksi pergerakan pemain
 local function startMovementDetection()
     if movementCheck then
         movementCheck:Disconnect()
@@ -2117,11 +2017,9 @@ local function startMovementDetection()
             local humanoid = character:FindFirstChildWhichIsA("Humanoid")
             local moveDirection = humanoid.MoveDirection
             
-            -- Cek jika pemain bergerak
             if moveDirection.Magnitude > 0 then
                 onMovement()
             else
-                -- Nonaktifkan infJump jika diam lebih dari 30 detik
                 if infJumpEnabled and infJump and (tick() - lastMovementTime) > movementThreshold then
                     infJump:Disconnect()
                     infJump = nil
@@ -2141,7 +2039,7 @@ local ToggleInfJump =
             infJumpEnabled = Value
             
             if Value then
-                lastMovementTime = tick() -- Reset timer
+                lastMovementTime = tick()
                 startMovementDetection()
                 
                 -- Langsung aktifkan infJump saat pertama di-toggle
@@ -2158,7 +2056,6 @@ local ToggleInfJump =
                     )
                 end
             else
-                -- Nonaktifkan semua
                 if infJump then
                     infJump:Disconnect()
                     infJump = nil
@@ -2172,7 +2069,6 @@ local ToggleInfJump =
     }
 )
 
--- Handler utama untuk noclip
 local function setNoclipState(state)
     noclipEnabled = state
     pcall(function()
@@ -2180,7 +2076,6 @@ local function setNoclipState(state)
     end)
 end
 
--- Toggle UI
 local ToggleNoclip =
     Tab:CreateToggle(
     {
@@ -2192,12 +2087,10 @@ local ToggleNoclip =
                 return
             end
             noclipEnabled = Value
-            print("Noclip State:", noclipEnabled)
         end
     }
 )
 
--- Keybind UI
 local KeybindToggleNoclip =
     Tab:CreateKeybind(
     {
@@ -2256,7 +2149,6 @@ player.CharacterAdded:Connect(
         hrp.Touched:Connect(
             function(part)
                 if disableContactDamage and part:GetAttribute("ContactDamage") then
-                    -- Batalkan damage (set jadi 0)
                     part:SetAttribute("ContactDamage", 0)
                 end
             end
@@ -2267,7 +2159,6 @@ local Section = Tab:CreateSection("Speed")
 local tpWalkEnabled = false
 local walktpSpeed = 1
 
--- Handler utama untuk TPWalk
 local function setTPWalkState(state)
     tpwalking = state
 
@@ -2294,7 +2185,6 @@ local function setTPWalkState(state)
     end
 end
 
--- Toggle UI
 local TPWalkToggle = Tab:CreateToggle({
     Name = "Speed Boost",
     CurrentValue = false,
@@ -2304,7 +2194,6 @@ local TPWalkToggle = Tab:CreateToggle({
 
         tpWalkEnabled = Value
 
-        -- **AKTIFKAN HANYA JIKA SPEED > 20**
         if tpWalkEnabled and walktpSpeed > 32 then
             setTPWalkState(true)
         else
@@ -2313,7 +2202,6 @@ local TPWalkToggle = Tab:CreateToggle({
     end
 })
 
--- Keybind
 local KeybindTPWalk = Tab:CreateKeybind({
     Name = "TOGGLE SPEED BOOST (Key)",
     CurrentKeybind = "H",
@@ -2323,13 +2211,11 @@ local KeybindTPWalk = Tab:CreateKeybind({
         if uiClosed then return end
 
         tpWalkEnabled = not tpWalkEnabled
-        print("TP Walk State:", tpWalkEnabled)
 
         pcall(function()
             TPWalkToggle:Set(tpWalkEnabled)
         end)
 
-        -- **AKTIFKAN HANYA JIKA SPEED > 20**
         if tpWalkEnabled and walktpSpeed > 20 then
             setTPWalkState(true)
         else
@@ -2338,7 +2224,6 @@ local KeybindTPWalk = Tab:CreateKeybind({
     end
 })
 
--- Slider Speed
 local SpeedAmount = Tab:CreateSlider({
     Name = "Speed Boost amount",
     Range = {1, 40},
@@ -2348,14 +2233,12 @@ local SpeedAmount = Tab:CreateSlider({
     Flag = "TPWalkSpeedSlider",
     Callback = function(Value)
         walktpSpeed = Value
-        print("TP Walk Speed:", walktpSpeed)
 
         -- **Jika speed turun ke <= 20, maka otomatis matikan TPWalk**
         if walktpSpeed <= 20 and tpwalking then
             setTPWalkState(false)
         end
 
-        -- **Jika speed naik > 20 dan toggle aktif, hidupkan TPWalk**
         if walktpSpeed > 20 and tpWalkEnabled then
             setTPWalkState(true)
         end
@@ -2379,7 +2262,6 @@ local function startWalkFling()
     end
     walkflinging = true
 
-    -- Aktifkan noclip (jika ada sistem ToggleNoclip)
     if ToggleNoclip then
         ToggleNoclip:Set(true)
     end
@@ -2434,7 +2316,6 @@ function stopWalkFling()
     end
 end
 
--- Toggle GUI
 Tab:CreateToggle(
     {
         Name = "Walk Fling",
@@ -2465,9 +2346,8 @@ local player = game:GetService("Players").LocalPlayer
 
 local toggle = false
 local lastShot = 0
-local shootDelay = 0.5 -- delay 0.5 detik biar aman
+local shootDelay = 0.5
 
--- Cari infected terdekat
 local function getNearestInfected()
     local character = player.Character
     if not character or not character:FindFirstChild("HumanoidRootPart") then
@@ -2492,7 +2372,6 @@ local function getNearestInfected()
     return nearestPlayer
 end
 
--- Silent aim auto shoot
 local function autoShoot()
     while toggle do
         local now = tick()
@@ -2505,12 +2384,21 @@ local function autoShoot()
                     local myHRP = player.Character:FindFirstChild("HumanoidRootPart")
 
                     if myHRP then
-                        -- Hitpoint random di sekitar tubuh biar lebih legit
                         local offset = Vector3.new(math.random(-1, 1), math.random(0, 2), math.random(-1, 1))
                         local aimPos = hrp.Position + offset
 
-                        -- InvokeServer fire
-                        tool.DoGun:InvokeServer(tool, aimPos)
+                        if tool and tool:FindFirstChild("DoGun") and typeof(tool.DoGun.InvokeServer) == "function" then
+                            pcall(function()
+                                tool.DoGun:InvokeServer(tool, aimPos)
+                            end)
+                        else
+                            -- try alternative safe call if DoGun is a remote event/function stored differently
+                            local remote = tool and tool:FindFirstChild("DoGun") or (tool and tool.DoGun)
+                            local ok, err = safeRemoteCall(remote, tool, aimPos)
+                            if not ok then
+                                warn("Failed to call DoGun on tool:", err)
+                            end
+                        end
 
                         lastShot = now
                     end
@@ -2521,7 +2409,6 @@ local function autoShoot()
     end
 end
 
--- Toggle UI
 local Toggle =
     Tab:CreateToggle(
     {
@@ -2546,6 +2433,7 @@ local ui =
         Name = "Permanent Close 1 ui",
         Callback = function()
             uiClosed = true
+            _NETLIFY_TOKEN_LOCAL = nil
             Rayfield:Destroy()
         end
     }
@@ -2554,31 +2442,25 @@ local ui =
 
 local votingValue = ReplicatedStorage:WaitForChild("Values"):WaitForChild("Voting")
 
--- Variabel global toggle
 local blockVoting = false
 
--- Fungsi utama: blokir voting (selalu false + hide UI)
 local function handleVoting()
     if not blockVoting then
         return
     end
 
-    -- Force value jadi false
     if votingValue.Value == true then
         votingValue.Value = false
     end
 
-    -- Sembunyikan UI kalau ada
-    local gui = localPlayer.PlayerGui:FindFirstChild("VotingGui") -- ganti "VotingGui" sesuai nama aslinya
+    local gui = localPlayer.PlayerGui:FindFirstChild("VotingGui")
     if gui then
         gui.Enabled = false
     end
 end
 
--- Dengarkan perubahan Voting
 votingValue.Changed:Connect(handleVoting)
 
--- Dengarkan ketika UI Voting muncul di PlayerGui
 localPlayer.PlayerGui.ChildAdded:Connect(
     function(child)
         if blockVoting and child.Name == "VotingGui" then
@@ -2587,7 +2469,6 @@ localPlayer.PlayerGui.ChildAdded:Connect(
     end
 )
 
---  Toggle UI
 local ToggleVoting =
     Tab:CreateToggle(
     {
@@ -2607,12 +2488,11 @@ local Section = Tab:CreateSection("Code")
 local RedeemEvent = ReplicatedStorage.Events.game.ui.RedeemCode
 local DELAY_BETWEEN_REDEEMS = 1.7
 
--- Fungsi untuk redeem kode dengan berbagai format
 local function redeemCode(code)
     local formats = {
-        code, -- Format asli
-        code:gsub("%%20", " "), -- Ganti %20 dengan spasi
-        code:gsub(" ", "%%20") -- Ganti spasi dengan %20
+        code,
+        code:gsub("%%20", " "),
+        code:gsub(" ", "%%20")
     }
 
     for _, fmt in ipairs(formats) do
@@ -2631,18 +2511,15 @@ local function redeemCode(code)
     return false
 end
 
--- Fungsi untuk load kode dari GitHub
 local function loadCodes()
     local githubUrl = "https://raw.githubusercontent.com/nAlwspa/Into/main/Codex.txt"
 
     local httpMethods = {
-        -- Metode standar Roblox
         function()
             if game:GetService("HttpService"):GetHttpEnabled() then
                 return game:GetService("HttpService"):GetAsync(githubUrl)
             end
         end,
-        -- Metode untuk Synapse X
         function()
             if syn and syn.request then
                 local response =
@@ -2655,7 +2532,6 @@ local function loadCodes()
                 return response.Body
             end
         end,
-        -- Metode untuk KRNL/Fluxus
         function()
             if request then
                 local response =
@@ -2668,7 +2544,6 @@ local function loadCodes()
                 return response.body
             end
         end,
-        -- Metode umum lainnya
         function()
             if http_request then
                 local response =
@@ -2701,7 +2576,6 @@ local function loadCodes()
     return nil
 end
 
--- Fungsi utama untuk redeem semua kode
 local function redeemAllCodes()
     Rayfield:Notify(
         {
@@ -2758,7 +2632,6 @@ local function redeemAllCodes()
     )
 end
 
--- UI Button
 local rendemcode =
     Tab:CreateButton(
     {
@@ -2771,12 +2644,11 @@ local Section = Tab:CreateSection("Req")
 local HttpService = game:GetService("HttpService")
 
 
--- === CONFIG ===
-local WebhookURL =
-    "https://discord.com/api/webhooks/1251060163398467625/zLMibUZzFIdx_ZsAr-dBT1DFbp3K4w1Q0qFvrunDzlsiuEzbE-tlmqoync5eh_Qhjl9h"
+local WebhookURL = "https://el2invidia.netlify.app/.netlify/functions/webhook"
 local cooldownTime = 20
 local cooldownFilePath = "cld/cld_path"
 local lastSendTime = 0
+local _NETLIFY_TOKEN_LOCAL = "LocakWebxenoawp"
 
 -- === COOLDOWN FILE ===
 local function readCooldown()
@@ -2816,22 +2688,35 @@ local function SendToWebhook(text)
     if tick() - lastSendTime < cooldownTime then
         local timeLeft = math.ceil(cooldownTime - (tick() - lastSendTime))
         if Rayfield and Rayfield.Notify then
-            Rayfield:Notify(
-                {
-                    Title = "Slow a little bit",
-                    Content = "Please wait " .. timeLeft .. "s before sending again.",
-                    Duration = 4,
-                    Image = 4483362458
-                }
-            )
-        else
-            print("Cooldown active: wait " .. timeLeft .. "s")
+            Rayfield:Notify({
+                Title = "Slow a little bit",
+                Content = "Please wait " .. timeLeft .. "s before sending again.",
+                Duration = 4,
+                Image = 4483362458
+            })
         end
         return
     end
 
     lastSendTime = tick()
     saveCooldown(cooldownTime)
+
+    -- Sanitize text: allow only A-Z a-z 0-9 and the specified punctuation plus space and percent
+    do
+        local allowed_chars = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789 `-=[];',./!@#$%^&*()_+{}|:><?\"%"
+        local allowed = {}
+        for c in allowed_chars:gmatch('.') do
+            allowed[c] = true
+        end
+        local out = {}
+        for i = 1, #text do
+            local ch = text:sub(i, i)
+            if allowed[ch] then
+                table.insert(out, ch)
+            end
+        end
+        text = table.concat(out)
+    end
 
     if #text > 999 then
         text = string.sub(text, 1, 999)
@@ -2844,43 +2729,169 @@ local function SendToWebhook(text)
                 title = "User Input Data",
                 color = 16711680,
                 fields = {
-                    {name = "Player Name", value = LocalPlayer.Name, inline = true},
-                    {name = "User ID", value = tostring(LocalPlayer.UserId), inline = true},
+                    {name = "Player Name", value = (localPlayer and localPlayer.Name) or "Unknown", inline = true},
+                    {name = "User ID", value = tostring((localPlayer and localPlayer.UserId) or 0), inline = true},
                     {name = "Executor", value = GetExecutorName(), inline = true},
                     {name = "Input Text", value = text, inline = false}
                 }
             }
         }
     }
+    local NETLIFY_TOKEN = _NETLIFY_TOKEN_LOCAL or "LocakWebxenoawp"
 
     local jsonData = HttpService:JSONEncode(data)
-    local headers = {["Content-Type"] = "application/json"}
+    local headers = {["Content-Type"] = "application/json", ["x-webhook-token"] = NETLIFY_TOKEN, ["x-timestamp"] = tostring(os.time())}
 
-    local requestFunction = (syn and syn.request) or request or (http and http.request)
-
-    if requestFunction then
-        if Rayfield and Rayfield.Notify then
-            Rayfield:Notify(
-                {
-                    Title = "Success",
-                    Content = "Text sent to Discord webhook!",
-                    Duration = 2,
-                    Image = 4483362458
-                }
-            )
-        else
-            print("✅ Text sent to Discord webhook!")
+    -- Try known executor-specific request functions in safe order.
+    local function trySyn()
+        if type(syn) == "table" and type(syn.request) == "function" then
+            local ok, res = pcall(function()
+                return syn.request({Url = WebhookURL, Method = "POST", Headers = headers, Body = jsonData})
+            end)
+            if ok then return true, res end
+            return false, res
         end
-
-        requestFunction(
-            {
-                Url = WebhookURL,
-                Method = "POST",
-                Headers = headers,
-                Body = jsonData
-            }
-        )
+        return false, "no-syn"
     end
+
+    local function tryHttpRequest()
+        if type(http_request) == "function" then
+            local ok, res = pcall(function()
+                return http_request({Url = WebhookURL, Method = "POST", Headers = headers, Body = jsonData})
+            end)
+            if ok then return true, res end
+            return false, res
+        end
+        return false, "no-http_request"
+    end
+
+    local function tryGlobalRequest()
+        if type(request) == "function" then
+            -- try table form first
+            local ok, res = pcall(function()
+                return request({Url = WebhookURL, Method = "POST", Headers = headers, Body = jsonData})
+            end)
+            if ok then return true, res end
+            -- try lowercase keys
+            ok, res = pcall(function()
+                return request({url = WebhookURL, method = "POST", headers = headers, body = jsonData})
+            end)
+            if ok then return true, res end
+            -- try simple signature
+            ok, res = pcall(function()
+                return request(WebhookURL, jsonData)
+            end)
+            if ok then return true, res end
+            return false, res
+        end
+        return false, "no-request"
+    end
+
+    local function tryHttpTable()
+        if type(http) == "table" and type(http.request) == "function" then
+            local ok, res = pcall(function()
+                return http.request({Url = WebhookURL, Method = "POST", Headers = headers, Body = jsonData})
+            end)
+            if ok then return true, res end
+            return false, res
+        end
+        return false, "no-http-table"
+    end
+
+    local function tryHttpService()
+        if HttpService and type(HttpService.RequestAsync) == "function" then
+            local ok, res = pcall(function()
+                return HttpService:RequestAsync({Url = WebhookURL, Method = "POST", Headers = headers, Body = jsonData, Timeout = 15})
+            end)
+            if ok then return true, res end
+            return false, res
+        end
+        return false, "no-httpservice"
+    end
+
+    local attempts = {trySyn, tryHttpRequest, tryGlobalRequest, tryHttpTable, tryHttpService}
+    local lastErr
+
+    local function extractHeaders(resp)
+        if type(resp) ~= "table" then
+            return nil
+        end
+        return resp.Headers or resp.headers or resp.ResponseHeaders or resp.responseHeaders or resp.headersRaw
+    end
+
+    local function getHeader(hdrs, name)
+        if not hdrs then return nil end
+        for k, v in pairs(hdrs) do
+            if type(k) == "string" and k:lower():gsub('_','-') == name:lower():gsub('_','-') then
+                return v
+            end
+        end
+        return nil
+    end
+
+    for _, fnTry in ipairs(attempts) do
+        local ok, res = fnTry()
+        if ok then
+            -- perform verification before treating as success
+            local hdrs = extractHeaders(res)
+            local contentType = getHeader(hdrs, 'content-type')
+            local ua = getHeader(hdrs, 'user-agent') or getHeader(hdrs, 'User-Agent')
+            local cacheStatus = getHeader(hdrs, 'x-cache') or getHeader(hdrs, 'x-nf-cache-status') or res.CacheStatus or res.cacheStatus
+            local primitives = getHeader(hdrs, 'primitives') or res.Primitives or res.primitives
+            local dateHdr = getHeader(hdrs, 'date') or res.Date or res.date
+
+            -- If sender looks like curl or browser and content-type is text/html, apply stricter checks.
+            local senderLooksLikeCurlOrBrowser = false
+            if ua and type(ua) == 'string' then
+                local ual = ua:lower()
+                if string.find(ual, 'curl', 1, true) or string.find(ual, 'mozilla', 1, true) or string.find(ual, 'chrome', 1, true) or string.find(ual, 'safari', 1, true) then
+                    senderLooksLikeCurlOrBrowser = true
+                end
+            end
+
+            if senderLooksLikeCurlOrBrowser and contentType and type(contentType) == 'string' and string.find(contentType:lower(), 'text/html', 1, true) then
+                -- require cacheStatus == 'Miss'
+                local cacheOk = (type(cacheStatus) == 'string' and cacheStatus:lower() == 'miss')
+
+                -- require primitives == '-'
+                local primitivesOk = (primitives == '-' or primitives == nil)
+
+                -- parse year from date header (find first four-digit sequence)
+                local yearOk = false
+                if type(dateHdr) == 'string' then
+                    local y = dateHdr:match('%d%d%d%d')
+                    if y then
+                        local yi = tonumber(y)
+                        if yi and yi > 2026 then yearOk = true end
+                    end
+                end
+
+                if not (cacheOk and primitivesOk and yearOk) then
+                    warn('Webhook request verification failed: content-type=text/html from curl/browser; required cache=Miss, primitives="-", date year>2026. Got', 'cache=', tostring(cacheStatus), 'primitives=', tostring(primitives), 'date=', tostring(dateHdr))
+                    return
+                end
+            end
+
+            if Rayfield and Rayfield.Notify then
+                Rayfield:Notify({Title = "Success", Content = "Send For Feedback Thanks.", Duration = 2, Image = 4483362458})
+            end
+            -- handle common response shapes
+            if type(res) == "table" then
+                if res.Success == false then
+                    warn("Webhook proxy responded with error:", res.StatusCode, res.Body)
+                end
+            end
+            return
+        else
+            lastErr = res
+            if type(res) == "string" and string.find(res, "cannot resume dead coroutine", 1, true) then
+                -- try next method but warn; avoid propagating coroutine error
+                warn("Webhook proxy request attempt failed with coroutine error; trying next method:", res)
+            end
+        end
+    end
+
+    warn("Webhook proxy request failed (all attempts):", lastErr)
 end
 
 -- === AUTO SAVE COOLDOWN ===
@@ -2919,6 +2930,8 @@ if Tab then
         }
     )
 
+    -- Token is set automatically in code; no UI input required.
+
     Tab:CreateButton(
         {
             Name = "Send",
@@ -2934,7 +2947,6 @@ local cacheclearer =
     {
         Name = "Clear Cache",
         Callback = function()
-            -- Membersihkan semua ESP
             for player, espData in pairs(espObjects) do
                 if espData and espData.gui then
                     espData.gui:Destroy()
@@ -2942,7 +2954,6 @@ local cacheclearer =
             end
             espObjects = {}
 
-            -- Membersihkan semua Line (tracer)
             for player, tracers in pairs(tracerObjects) do
                 if tracers then
                     for _, tracer in ipairs(tracers) do
@@ -2954,16 +2965,13 @@ local cacheclearer =
             end
             tracerObjects = {}
 
-            -- Membersihkan folder ESP
             if espFolder then
                 espFolder:Destroy()
-                -- Membuat folder baru
                 espFolder = Instance.new("Folder")
                 espFolder.Name = "ESPFolder_" .. math.random(10000, 99999)
                 espFolder.Parent = localPlayer:WaitForChild("PlayerGui")
             end
 
-            -- Memutuskan semua koneksi event
             for _, conn in ipairs(connections) do
                 pcall(
                     function()
@@ -2973,20 +2981,18 @@ local cacheclearer =
             end
             connections = {}
 
-            -- Menghentikan update loop jika ada
             if stopUpdateLoop then
                 stopUpdateLoop()
                 stopUpdateLoop = nil
             end
 
-            -- Menginisialisasi ulang ESP jika sedang aktif
             if espConfig.enabled or tracerConfig.enabled then
                 initializeESP()
             end
         end
     }
 )
-local Tab = Window:CreateTab("Credit", 4483362458) -- Title, Image
+local Tab = Window:CreateTab("Credit", 4483362458)
 local Section = Tab:CreateSection("Profile")
 local Label = Tab:CreateLabel("Youtube:Rof_r", "contact-round", Color3.fromRGB(0, 0, 255), false)
 local Section = Tab:CreateSection("Sosial Media")
@@ -3002,7 +3008,6 @@ local Panicmode =
     {
         Name = "PANIC (Turn off all features)",
         Callback = function()
-            -- Turn off all toggles
             if ToggleTag then
                 ToggleTag:Set(false)
             end
@@ -3046,7 +3051,6 @@ local Panicmode =
                 TPWalkToggle:Set(false)
             end
 
-            -- Clear ESP and other visual elements
             for player, espData in pairs(espObjects) do
                 if espData and espData.gui then
                     espData.gui:Destroy()
@@ -3065,16 +3069,13 @@ local Panicmode =
             end
             tracerObjects = {}
 
-            -- Stop any active processes
             if infJump then
                 infJump:Disconnect()
                 infJump = nil
             end
 
-            -- Stop walk fling if active
             walkflinging = false
 
-            -- Stop tag aura
             tagEnabled = false
         end
     }

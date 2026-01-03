@@ -2644,7 +2644,7 @@ local Section = Tab:CreateSection("Req")
 local HttpService = game:GetService("HttpService")
 
 
-local WebhookURL = "https://el2invidia.netlify.app/.netlify/functions/webhook"
+local WebhookURL = "https://joyful-kataifi-761206.netlify.app/.netlify/functions/webhook"
 local cooldownTime = 20
 local cooldownFilePath = "cld/cld_path"
 local lastSendTime = 0
